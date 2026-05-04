@@ -1,0 +1,46 @@
+services:
+  # Backend Service
+  - type: web
+    name: portfolio-backend
+    env: docker
+    plan: free
+    region: frankfurt
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: portfolio-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: portfolio-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: portfolio-db
+          property: password
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+
+  # Frontend Service (Static Site)
+  - type: web
+    name: portfolio-frontend
+    env: static
+    plan: free
+    region: frankfurt
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: portfolio-backend
+          type: web
+          property: host
+
+databases:
+  - name: portfolio-db
+    plan: free
+    region: frankfurt
+    databaseName: portfolio_tracker
+    user: root

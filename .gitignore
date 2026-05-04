@@ -1,7 +1,21 @@
-node_modules/
+# Build artifacts
+dist/
 target/
-.DS_Store
-*.zip
 *.jar
-.mvn/wrapper/maven-wrapper.jar
 
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+
+# Docker
+db-data/
+
+# Data (Sensitive or Local Only)
+imported/
+*.csv
