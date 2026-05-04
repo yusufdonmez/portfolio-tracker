@@ -50,10 +50,15 @@ function App() {
     ]
   };
 
-  const pieData = Object.keys(dashboardData.allocation).map(key => ({
-    name: key,
-    value: dashboardData.allocation[key]
-  }));
+  const pieData = dashboardData.top5Allocation 
+    ? Object.keys(dashboardData.top5Allocation).map(key => ({
+        name: key,
+        value: dashboardData.top5Allocation[key]
+      }))
+    : Object.keys(dashboardData.allocation).map(key => ({
+        name: key,
+        value: dashboardData.allocation[key]
+      }));
 
   return (
     <div className="dashboard-container">

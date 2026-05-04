@@ -37,7 +37,7 @@ public class CsvImportService {
 
             for (CSVRecord record : csvParser) {
                 String symbol = record.get("Symbol");
-                if (symbol == null || symbol.isEmpty()) continue;
+                if (symbol == null || symbol.isEmpty() || symbol.equals("$$CASH_TX")) continue;
 
                 String typeStr = record.get("Transaction Type");
                 TransactionType txType = parseTransactionType(typeStr);

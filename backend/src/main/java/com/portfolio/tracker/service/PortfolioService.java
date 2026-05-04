@@ -32,6 +32,9 @@ public class PortfolioService {
             List<Transaction> txs = transactionRepository.findByAssetId(asset.getId());
             if (txs.isEmpty()) continue;
 
+            // Sort transactions by date to ensure correct balance calculation
+            txs.sort(Comparator.comparing(Transaction::getTransactionDate));
+
             AssetSummaryDTO summary = calculateAssetSummary(asset, txs);
             if (summary.getQuantity() > 0 || summary.getType() == AssetType.CASH) {
                 assetSummaries.add(summary);
@@ -40,23 +43,41 @@ public class PortfolioService {
                 
                 allocation.merge(asset.getType(), summary.getMarketValue(), Double::sum);
             }
+        // Sort assets by market value descending (Risk/Exposure)
+        assetSummaries.sort(Comparator.comparing(AssetSummaryDTO::getMarketValue).reversed());
+
+        // Calculate Top 5 vs Others for Allocation
+        Map<AssetType, Double> typeAllocation = new EnumMap<>(AssetType.class);
+        Map<String, Double> top5Allocation = new LinkedHashMap<>();
+        double othersValue = 0;
+
+        for (int i = 0; i < assetSummaries.size(); i++) {
+            AssetSummaryDTO asset = assetSummaries.get(i);
+            typeAllocation.merge(asset.getType(), asset.getMarketValue(), Double::sum);
+            
+            if (i < 5) {
+                top5Allocation.put(asset.getSymbol(), asset.getMarketValue());
+            } else {
+                othersValue += asset.getMarketValue();
+            }
+        }
+        if (othersValue > 0) {
+            top5Allocation.put("Others", othersValue);
         }
 
         String topRisk = "None";
-        double maxWeight = 0;
-        for (AssetSummaryDTO asset : assetSummaries) {
-            double weight = asset.getMarketValue() / totalValue;
-            if (weight > maxWeight) {
-                maxWeight = weight;
-                topRisk = asset.getSymbol() + " (" + String.format("%.1f", weight * 100) + "%)";
-            }
+        if (!assetSummaries.isEmpty()) {
+            AssetSummaryDTO mostConcentrated = assetSummaries.get(0);
+            double weight = mostConcentrated.getMarketValue() / totalValue;
+            topRisk = mostConcentrated.getSymbol() + " (" + String.format("%.1f", weight * 100) + "%)";
         }
 
         return PortfolioSummaryDTO.builder()
                 .totalValue(totalValue)
                 .totalPnL(totalPnL)
-                .dailyChange(0.0) // Placeholder
-                .allocation(allocation)
+                .dailyChange(0.0)
+                .allocation(typeAllocation)
+                .top5Allocation(top5Allocation) // Need to add this to DTO
                 .assets(assetSummaries)
                 .topRisk(topRisk)
                 .build();

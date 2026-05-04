@@ -14,6 +14,7 @@ public class PortfolioSummaryDTO {
     private Double totalPnL;
     private Double dailyChange;
     private Map<AssetType, Double> allocation;
+    private Map<String, Double> top5Allocation;
     private List<AssetSummaryDTO> assets;
     private String topRisk;
 }
