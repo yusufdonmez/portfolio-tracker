@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,7 +23,6 @@ public class PortfolioService {
     public PortfolioSummaryDTO getSummary() {
         List<Asset> allAssets = assetRepository.findAll();
         List<AssetSummaryDTO> assetSummaries = new ArrayList<>();
-        Map<AssetType, Double> allocation = new EnumMap<>(AssetType.class);
         Double totalValue = 0.0;
         Double totalPnL = 0.0;
 
@@ -40,9 +38,9 @@ public class PortfolioService {
                 assetSummaries.add(summary);
                 totalValue += summary.getMarketValue();
                 totalPnL += summary.getPnl();
-                
-                allocation.merge(asset.getType(), summary.getMarketValue(), Double::sum);
             }
+        }
+
         // Sort assets by market value descending (Risk/Exposure)
         assetSummaries.sort(Comparator.comparing(AssetSummaryDTO::getMarketValue).reversed());
 
@@ -68,7 +66,8 @@ public class PortfolioService {
         String topRisk = "None";
         if (!assetSummaries.isEmpty()) {
             AssetSummaryDTO mostConcentrated = assetSummaries.get(0);
-            double weight = mostConcentrated.getMarketValue() / totalValue;
+            double totalValForRisk = totalValue > 0 ? totalValue : 1.0;
+            double weight = mostConcentrated.getMarketValue() / totalValForRisk;
             topRisk = mostConcentrated.getSymbol() + " (" + String.format("%.1f", weight * 100) + "%)";
         }
 
@@ -77,7 +76,7 @@ public class PortfolioService {
                 .totalPnL(totalPnL)
                 .dailyChange(0.0)
                 .allocation(typeAllocation)
-                .top5Allocation(top5Allocation) // Need to add this to DTO
+                .top5Allocation(top5Allocation)
                 .assets(assetSummaries)
                 .topRisk(topRisk)
                 .build();
@@ -87,7 +86,6 @@ public class PortfolioService {
         double totalQuantity = 0;
         double totalCost = 0;
         
-        // Simple FIFO or Average Cost - using Average Cost here
         for (Transaction tx : txs) {
             Double q = tx.getQuantity();
             Double p = tx.getPrice();
