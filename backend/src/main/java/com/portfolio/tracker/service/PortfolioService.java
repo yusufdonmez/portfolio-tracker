@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,49 +20,66 @@ public class PortfolioService {
 
     private final AssetRepository assetRepository;
     private final TransactionRepository transactionRepository;
+    private final MarketDataService marketDataService;
 
     public PortfolioSummaryDTO getSummary() {
         List<Asset> allAssets = assetRepository.findAll();
+        
+        // Fetch live prices for all assets except cash
+        Set<String> symbols = allAssets.stream()
+                .filter(a -> a.getType() != AssetType.CASH)
+                .map(Asset::getSymbol)
+                .collect(Collectors.toSet());
+        
+        Map<String, Double> livePrices = marketDataService.getPrices(symbols);
+        
         List<AssetSummaryDTO> assetSummaries = new ArrayList<>();
         Double totalValue = 0.0;
         Double totalPnL = 0.0;
+        Double totalCash = 0.0;
 
         for (Asset asset : allAssets) {
             List<Transaction> txs = transactionRepository.findByAssetId(asset.getId());
             if (txs.isEmpty()) continue;
 
-            // Sort transactions by date to ensure correct balance calculation
             txs.sort(Comparator.comparing(Transaction::getTransactionDate));
 
+            if (asset.getType() != AssetType.CASH) {
+                Double livePrice = livePrices.get(asset.getSymbol());
+                if (livePrice != null) {
+                    asset.setCurrentPrice(livePrice);
+                }
+            }
+
             AssetSummaryDTO summary = calculateAssetSummary(asset, txs);
-            // Use a small epsilon to filter out floating point dust (like 1.11e-16)
-            if (summary.getQuantity() > 0.0001 || summary.getType() == AssetType.CASH) {
+            
+            if (asset.getType() == AssetType.CASH) {
+                totalCash += summary.getMarketValue();
+            } else if (summary.getQuantity() > 0.0001) {
                 assetSummaries.add(summary);
                 totalValue += summary.getMarketValue();
                 totalPnL += summary.getPnl();
             }
         }
 
-        // Sort assets by market value descending (Risk/Exposure)
         assetSummaries.sort(Comparator.comparing(AssetSummaryDTO::getMarketValue).reversed());
 
-        // Calculate Top 5 vs Others for Allocation
         Map<AssetType, Double> typeAllocation = new EnumMap<>(AssetType.class);
-        Map<String, Double> top5Allocation = new LinkedHashMap<>();
+        Map<String, Double> top10Allocation = new LinkedHashMap<>();
         double othersValue = 0;
 
         for (int i = 0; i < assetSummaries.size(); i++) {
             AssetSummaryDTO asset = assetSummaries.get(i);
             typeAllocation.merge(asset.getType(), asset.getMarketValue(), Double::sum);
             
-            if (i < 5) {
-                top5Allocation.put(asset.getSymbol(), asset.getMarketValue());
+            if (i < 10) {
+                top10Allocation.put(asset.getSymbol(), asset.getMarketValue());
             } else {
                 othersValue += asset.getMarketValue();
             }
         }
         if (othersValue > 0) {
-            top5Allocation.put("Others", othersValue);
+            top10Allocation.put("Others", othersValue);
         }
 
         String topRisk = "None";
@@ -73,11 +91,12 @@ public class PortfolioService {
         }
 
         return PortfolioSummaryDTO.builder()
-                .totalValue(totalValue)
+                .totalValue(totalValue + totalCash) // Total portfolio including cash
                 .totalPnL(totalPnL)
+                .totalCash(totalCash)
                 .dailyChange(0.0)
                 .allocation(typeAllocation)
-                .top5Allocation(top5Allocation)
+                .top10Allocation(top10Allocation)
                 .assets(assetSummaries)
                 .topRisk(topRisk)
                 .build();
@@ -86,7 +105,6 @@ public class PortfolioService {
     private AssetSummaryDTO calculateAssetSummary(Asset asset, List<Transaction> txs) {
         double totalQuantity = 0;
         double totalCost = 0;
-        
         double multiplier = (asset.getType() == AssetType.OPTION) ? 100.0 : 1.0;
         
         for (Transaction tx : txs) {

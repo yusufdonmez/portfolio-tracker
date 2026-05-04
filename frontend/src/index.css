@@ -38,6 +38,31 @@ body {
   box-sizing: border-box;
 }
 
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 20px;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 20px;
+  }
+
+  .glass-card h2 {
+    font-size: 28px !important;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  div[style*="grid-template-columns: 1fr 2fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .glass-card {
   background: var(--card-bg);
   backdrop-filter: var(--glass);

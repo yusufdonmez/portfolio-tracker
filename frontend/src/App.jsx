@@ -5,10 +5,10 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Wallet, AlertTriangle, 
-  ArrowUpRight, Plus, Download, RefreshCw 
+  ArrowUpRight, Plus, Download, RefreshCw, ExternalLink, Banknote
 } from 'lucide-react';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#f97316', '#a855f7', '#ec4899', '#64748b'];
 
 function App() {
   const [data, setData] = useState(null);
@@ -51,18 +51,18 @@ function App() {
   const dashboardData = data || {
     totalValue: 125430.50,
     totalPnL: 15200.25,
+    totalCash: 5430.50,
     allocation: { STOCK: 85000, CRYPTO: 25000, OPTION: 5000, COMMODITY: 10430.50 },
     assets: [
-      { symbol: 'TSLA', quantity: 10, marketValue: 2500.0, pnl: 450.0, pnlPercentage: 18.5, type: 'STOCK' },
-      { symbol: 'BTC', quantity: 0.5, marketValue: 32000.0, pnl: 12000.0, pnlPercentage: 60.0, type: 'CRYPTO' },
-      { symbol: 'GLD', quantity: 50, marketValue: 10430.5, pnl: 300.0, pnlPercentage: 2.8, type: 'COMMODITY' }
+      { symbol: 'TSLA', quantity: 10, currentPrice: 250.0, marketValue: 2500.0, pnl: 450.0, pnlPercentage: 18.5, type: 'STOCK' },
+      { symbol: 'BTC', quantity: 0.5, currentPrice: 64000.0, marketValue: 32000.0, pnl: 12000.0, pnlPercentage: 60.0, type: 'CRYPTO' }
     ]
   };
 
-  const pieData = dashboardData.top5Allocation 
-    ? Object.keys(dashboardData.top5Allocation).map(key => ({
+  const pieData = dashboardData.top10Allocation 
+    ? Object.keys(dashboardData.top10Allocation).map(key => ({
         name: key,
-        value: dashboardData.top5Allocation[key]
+        value: dashboardData.top10Allocation[key]
       }))
     : Object.keys(dashboardData.allocation).map(key => ({
         name: key,
@@ -73,7 +73,7 @@ function App() {
     <div className="dashboard-container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <div>
-          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.0.1</span></h1>
+          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.0.2</span></h1>
           <p className="text-secondary">Hoş geldin, yatırım yolculuğun burada.</p>
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
@@ -86,7 +86,7 @@ function App() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '40px' }}>
         <div className="glass-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <div style={{ padding: '10px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '12px' }}>
@@ -94,7 +94,7 @@ function App() {
             </div>
             <span className="text-secondary">Toplam Varlık</span>
           </div>
-          <h2 style={{ fontSize: '36px' }}>{formatCurrency(dashboardData.totalValue)}</h2>
+          <h2 style={{ fontSize: '32px' }}>{formatCurrency(dashboardData.totalValue)}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '12px' }}>
             <TrendingUp className="text-success" size={16} />
             <span className="text-success">+12.5%</span>
@@ -109,10 +109,21 @@ function App() {
             </div>
             <span className="text-secondary">Toplam Kar/Zarar</span>
           </div>
-          <h2 style={{ fontSize: '36px' }} className={dashboardData.totalPnL >= 0 ? "text-success" : "text-danger"}>
+          <h2 style={{ fontSize: '32px' }} className={dashboardData.totalPnL >= 0 ? "text-success" : "text-danger"}>
             {dashboardData.totalPnL >= 0 ? '+' : ''}{formatCurrency(dashboardData.totalPnL)}
           </h2>
           <p className="text-secondary" style={{ marginTop: '12px' }}>Gerçekleşmemiş PnL</p>
+        </div>
+
+        <div className="glass-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ padding: '10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '12px' }}>
+              <Banknote className="text-warning" size={24} />
+            </div>
+            <span className="text-secondary">Nakit Bakiyesi</span>
+          </div>
+          <h2 style={{ fontSize: '32px' }}>{formatCurrency(dashboardData.totalCash || 0)}</h2>
+          <p className="text-secondary" style={{ marginTop: '12px' }}>Kullanılabilir Nakit</p>
         </div>
 
         <div className="glass-card">
@@ -122,14 +133,14 @@ function App() {
             </div>
             <span className="text-secondary">En Büyük Risk</span>
           </div>
-          <h2 style={{ fontSize: '36px' }}>{dashboardData.topRisk || 'Hesaplanıyor...'}</h2>
-          <p className="text-secondary" style={{ marginTop: '12px' }}>Varlık yoğunluğu bazlı risk analizi.</p>
+          <h2 style={{ fontSize: '32px' }}>{dashboardData.topRisk || 'None'}</h2>
+          <p className="text-secondary" style={{ marginTop: '12px' }}>Varlık yoğunluğu analizi.</p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
-        <div className="glass-card">
-          <h3>Varlık Dağılımı</h3>
+      <div className="main-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <h3>Varlık Dağılımı (Top 10)</h3>
           <div style={{ height: '300px', marginTop: '20px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -154,54 +165,52 @@ function App() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ marginTop: '20px' }}>
+          <div style={{ marginTop: '20px', maxHeight: '300px', overflowY: 'auto' }}>
             {pieData.map((entry, index) => (
-              <div key={entry.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div key={entry.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingRight: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: COLORS[index % COLORS.length] }}></div>
-                  <span className="text-secondary">{entry.name}</span>
+                  <span className="text-secondary" style={{ fontSize: '14px' }}>{entry.name}</span>
                 </div>
-                <span>%{(entry.value / dashboardData.totalValue * 100).toFixed(1)}</span>
+                <span style={{ fontSize: '14px' }}>%{(entry.value / dashboardData.totalValue * 100).toFixed(1)}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3>Varlık Detayları</h3>
-            <span className="text-primary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Tümünü Gör <ArrowUpRight size={16} />
-            </span>
           </div>
           <table>
             <thead>
               <tr>
                 <th>Sembol</th>
                 <th>Miktar</th>
+                <th>Fiyat</th>
                 <th>Değer</th>
                 <th>PnL</th>
-                <th>Risk Skoru</th>
               </tr>
             </thead>
             <tbody>
               {dashboardData.assets.map((asset) => (
                 <tr key={asset.symbol}>
-                  <td style={{ fontWeight: 600 }}>{asset.symbol}</td>
+                  <td>
+                    <a 
+                      href={`https://finance.yahoo.com/quote/${asset.symbol}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ticker-link"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'inherit', fontWeight: 600 }}
+                    >
+                      {asset.symbol} <ExternalLink size={14} className="text-primary" />
+                    </a>
+                  </td>
                   <td>{asset.quantity.toFixed(asset.type === 'CRYPTO' ? 4 : 2)}</td>
+                  <td style={{ fontWeight: 500 }}>{formatCurrency(asset.currentPrice)}</td>
                   <td>{formatCurrency(asset.marketValue)}</td>
                   <td className={asset.pnl >= 0 ? 'text-success' : 'text-danger'}>
                     {asset.pnl >= 0 ? '+' : ''}{formatCurrency(asset.pnl)} ({asset.pnlPercentage.toFixed(1)}%)
-                  </td>
-                  <td>
-                    <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
-                      <div style={{ 
-                        width: Math.min(100, (asset.marketValue / dashboardData.totalValue * 100)) + '%', 
-                        height: '100%', 
-                        background: asset.pnl >= 0 ? 'var(--success)' : 'var(--danger)',
-                        borderRadius: '3px'
-                      }}></div>
-                    </div>
                   </td>
                 </tr>
               ))}
