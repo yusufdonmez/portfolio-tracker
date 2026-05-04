@@ -38,4 +38,7 @@ public class Transaction {
     private String platform; // Midas, IBKR, Akbank, etc.
 
     private String notes;
+
+    @Column(unique = true)
+    private String uniqueIdentifier;
 }

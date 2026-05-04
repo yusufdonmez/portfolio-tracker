@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Wallet, AlertTriangle, 
-  ArrowUpRight, Plus, Download, RefreshCw, ExternalLink, Banknote
+  ArrowUpRight, Plus, Download, RefreshCw, ExternalLink, Banknote, X, Upload, CheckCircle2
 } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#f97316', '#a855f7', '#ec4899', '#64748b'];
@@ -13,6 +13,11 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -27,6 +32,45 @@ function App() {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFiles(Array.from(e.target.files));
+  };
+
+  const handleImport = async () => {
+    if (selectedFiles.length === 0) return;
+    
+    setImporting(true);
+    setImportStatus(null);
+    
+    const formData = new FormData();
+    selectedFiles.forEach(file => {
+      formData.append('files', file);
+    });
+
+    try {
+      const response = await fetch('http://localhost:8080/api/import', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+      if (result.success) {
+        setImportStatus({ type: 'success', message: result.message });
+        fetchData(); // Refresh dashboard
+        setTimeout(() => {
+          setIsImportModalOpen(false);
+          setImportStatus(null);
+          setSelectedFiles([]);
+        }, 2000);
+      } else {
+        setImportStatus({ type: 'error', message: 'İthalat başarısız oldu.' });
+      }
+    } catch (error) {
+      setImportStatus({ type: 'error', message: 'Bir hata oluştu.' });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -47,16 +91,12 @@ function App() {
     );
   }
 
-  // Mock data if server is not running or empty
   const dashboardData = data || {
-    totalValue: 125430.50,
-    totalPnL: 15200.25,
-    totalCash: 5430.50,
-    allocation: { STOCK: 85000, CRYPTO: 25000, OPTION: 5000, COMMODITY: 10430.50 },
-    assets: [
-      { symbol: 'TSLA', quantity: 10, currentPrice: 250.0, marketValue: 2500.0, pnl: 450.0, pnlPercentage: 18.5, type: 'STOCK' },
-      { symbol: 'BTC', quantity: 0.5, currentPrice: 64000.0, marketValue: 32000.0, pnl: 12000.0, pnlPercentage: 60.0, type: 'CRYPTO' }
-    ]
+    totalValue: 0,
+    totalPnL: 0,
+    totalCash: 0,
+    allocation: {},
+    assets: []
   };
 
   const pieData = dashboardData.top10Allocation 
@@ -73,18 +113,104 @@ function App() {
     <div className="dashboard-container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <div>
-          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.0.2</span></h1>
+          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.1.2</span></h1>
           <p className="text-secondary">Hoş geldin, yatırım yolculuğun burada.</p>
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
           <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Plus size={20} /> Yeni İşlem
           </button>
-          <button className="glass-card" style={{ padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button 
+            className="glass-card" 
+            style={{ padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            onClick={() => setIsImportModalOpen(true)}
+          >
             <Download size={20} /> İçe Aktar
           </button>
         </div>
       </header>
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px'
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: '32px', position: 'relative' }}>
+            <button 
+              onClick={() => setIsImportModalOpen(false)}
+              style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+            >
+              <X size={24} />
+            </button>
+            
+            <h2 style={{ marginBottom: '24px' }}>Veri İçe Aktar</h2>
+            <p className="text-secondary" style={{ marginBottom: '24px' }}>
+              Midas, IBKR veya Akbank CSV dosyalarınızı seçin. Mükerrer kayıtlar otomatik olarak ayıklanacaktır.
+            </p>
+
+            <div 
+              onClick={() => fileInputRef.current.click()}
+              style={{
+                border: '2px dashed rgba(99, 102, 241, 0.3)',
+                borderRadius: '16px',
+                padding: '40px 20px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                marginBottom: '24px',
+                background: 'rgba(99, 102, 241, 0.05)'
+              }}
+            >
+              <Upload className="text-primary" size={48} style={{ marginBottom: '16px', margin: '0 auto' }} />
+              <p style={{ fontWeight: 500 }}>Dosyaları Seçmek İçin Tıklayın</p>
+              <p className="text-secondary" style={{ fontSize: '14px', marginTop: '8px' }}>veya sürükleyip bırakın</p>
+              <input 
+                type="file" 
+                multiple 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                style={{ display: 'none' }}
+                accept=".csv"
+              />
+            </div>
+
+            {selectedFiles.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <p style={{ fontWeight: 500, marginBottom: '12px' }}>Seçilen Dosyalar ({selectedFiles.length}):</p>
+                <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                  {selectedFiles.map(file => (
+                    <div key={file.name} style={{ fontSize: '14px', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle2 size={14} className="text-success" /> {file.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importStatus && (
+              <div style={{ 
+                padding: '12px', borderRadius: '8px', marginBottom: '24px',
+                background: importStatus.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                color: importStatus.type === 'success' ? 'var(--success)' : 'var(--danger)',
+                display: 'flex', alignItems: 'center', gap: '8px'
+              }}>
+                {importStatus.type === 'success' ? <CheckCircle2 size={20} /> : <AlertTriangle size={20} />}
+                {importStatus.message}
+              </div>
+            )}
+
+            <button 
+              className="btn-primary" 
+              style={{ width: '100%', padding: '16px', fontSize: '16px' }}
+              onClick={handleImport}
+              disabled={selectedFiles.length === 0 || importing}
+            >
+              {importing ? <RefreshCw className="animate-spin" size={20} style={{ margin: '0 auto' }} /> : 'İçe Aktarmayı Başlat'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '40px' }}>
         <div className="glass-card">

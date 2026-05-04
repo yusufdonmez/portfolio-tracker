@@ -1,6 +1,9 @@
 package com.portfolio.tracker.service;
 
-import com.portfolio.tracker.model.*;
+import com.portfolio.tracker.model.Asset;
+import com.portfolio.tracker.model.AssetType;
+import com.portfolio.tracker.model.Transaction;
+import com.portfolio.tracker.model.TransactionType;
 import com.portfolio.tracker.repository.AssetRepository;
 import com.portfolio.tracker.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +19,7 @@ import java.io.Reader;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,12 +30,15 @@ public class CsvImportService {
     private final TransactionRepository transactionRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final Pattern OPTION_PATTERN = Pattern.compile("^([A-Z]+)([0-9]{6})([CP])([0-9]+)$");
 
     @Transactional
-    public void importCsv(String filePath, String platform) throws Exception {
+    public void importCsv(String filePath, String platform) {
+        log.info("Starting CSV import for platform: {} from file: {}", platform, filePath);
         try (Reader reader = new FileReader(filePath);
-             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader())) {
+             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withIgnoreHeaderCase().withTrim())) {
+
+            int importedCount = 0;
+            int skippedCount = 0;
 
             for (CSVRecord record : csvParser) {
                 String symbol = record.get("Symbol");
@@ -52,7 +57,7 @@ public class CsvImportService {
                 }
 
                 Double quantity = parseDouble(record.get("Quantity"));
-                if (quantity == null) continue; // Skip rows without quantity
+                if (quantity == null) continue;
                 
                 Double price = parseDouble(record.get("Purchase Price"));
                 if (price == null && txType != TransactionType.DEPOSIT && txType != TransactionType.WITHDRAWAL) continue;
@@ -64,6 +69,14 @@ public class CsvImportService {
                     ? LocalDate.parse(tradeDateStr, DATE_FORMATTER).atStartOfDay() 
                     : LocalDateTime.now();
 
+                // Generate Unique Identifier for deduplication
+                String uniqueId = generateUniqueId(tradeDateStr, symbol, quantity, price, txType, platform);
+                
+                if (transactionRepository.findByUniqueIdentifier(uniqueId).isPresent()) {
+                    skippedCount++;
+                    continue;
+                }
+
                 Transaction transaction = Transaction.builder()
                         .asset(asset)
                         .type(txType)
@@ -72,64 +85,68 @@ public class CsvImportService {
                         .fee(commission != null ? commission : 0.0)
                         .transactionDate(tradeDate)
                         .platform(platform)
-                        .notes(record.get("Comment"))
+                        .uniqueIdentifier(uniqueId)
                         .build();
 
                 transactionRepository.save(transaction);
+                importedCount++;
             }
+            log.info("Import finished for {}. Imported: {}, Skipped (duplicates): {}", platform, importedCount, skippedCount);
+        } catch (Exception e) {
+            log.error("Error importing CSV: {}", e.getMessage());
+            throw new RuntimeException("CSV import failed", e);
         }
     }
 
-    private Asset getOrCreateAsset(String symbol) {
-        return assetRepository.findBySymbol(symbol).orElseGet(() -> {
-            AssetType type = AssetType.STOCK;
-            OptionType optionType = OptionType.NONE;
-            Double strike = null;
-            LocalDate expiry = null;
-
-            if (symbol.equals("$$CASH_TX")) {
-                type = AssetType.CASH;
-            } else if (symbol.equals("GLD") || symbol.equals("XAU")) {
-                type = AssetType.COMMODITY;
-            } else {
-                Matcher matcher = OPTION_PATTERN.matcher(symbol);
-                if (matcher.matches()) {
-                    type = AssetType.OPTION;
-                    optionType = matcher.group(3).equals("C") ? OptionType.CALL : OptionType.PUT;
-                    // Simplified parsing for expiry and strike
-                    String expiryStr = matcher.group(2);
-                    expiry = LocalDate.parse("20" + expiryStr, DateTimeFormatter.ofPattern("yyyyMMdd"));
-                    strike = Double.parseDouble(matcher.group(4)) / 1000.0; // Assuming strike format
-                }
-            }
-
-            Asset asset = Asset.builder()
-                    .symbol(symbol)
-                    .type(type)
-                    .optionType(optionType)
-                    .strikePrice(strike)
-                    .expirationDate(expiry)
-                    .currency("USD") // Default
-                    .build();
-            return assetRepository.save(asset);
-        });
+    private String generateUniqueId(String date, String symbol, Double qty, Double price, TransactionType type, String platform) {
+        return String.format("%s_%s_%s_%s_%s_%s", 
+            date != null ? date : "00000000", 
+            symbol, 
+            qty != null ? qty : 0.0, 
+            price != null ? price : 0.0, 
+            type, 
+            platform.toLowerCase());
     }
 
-    private TransactionType parseTransactionType(String type) {
-        if (type == null) return TransactionType.BUY;
-        return switch (type.toUpperCase()) {
-            case "SELL" -> TransactionType.SELL;
-            case "DEPOSIT" -> TransactionType.DEPOSIT;
-            case "WITHDRAWAL" -> TransactionType.WITHDRAWAL;
-            case "DIVIDEND" -> TransactionType.DIVIDEND;
-            default -> TransactionType.BUY;
-        };
+    private Asset getOrCreateAsset(String symbol) {
+        Optional<Asset> existing = assetRepository.findBySymbol(symbol);
+        if (existing.isPresent()) return existing.get();
+
+        AssetType type = AssetType.STOCK;
+        if (symbol.equals("$$CASH_TX")) {
+            type = AssetType.CASH;
+        } else if (symbol.equals("BTC") || symbol.equals("ETH") || symbol.equals("SOL")) {
+            type = AssetType.CRYPTO;
+        } else if (symbol.equals("GLD") || symbol.equals("SLV")) {
+            type = AssetType.COMMODITY;
+        } else if (symbol.matches(".*[0-9]{6}[CP][0-9]{8}.*")) {
+            type = AssetType.OPTION;
+        }
+
+        Asset asset = Asset.builder()
+                .symbol(symbol)
+                .name(symbol) // Default to symbol
+                .type(type)
+                .currency("USD") // Default
+                .build();
+
+        return assetRepository.save(asset);
+    }
+
+    private TransactionType parseTransactionType(String typeStr) {
+        if (typeStr == null) return TransactionType.BUY;
+        typeStr = typeStr.toUpperCase();
+        if (typeStr.contains("SELL")) return TransactionType.SELL;
+        if (typeStr.contains("BUY")) return TransactionType.BUY;
+        if (typeStr.contains("DEPOSIT")) return TransactionType.DEPOSIT;
+        if (typeStr.contains("WITHDRAW")) return TransactionType.WITHDRAWAL;
+        return TransactionType.BUY;
     }
 
     private Double parseDouble(String value) {
-        if (value == null || value.isEmpty()) return null;
+        if (value == null || value.isEmpty() || value.equals("-")) return null;
         try {
-            return Double.parseDouble(value);
+            return Double.parseDouble(value.replace(",", ""));
         } catch (NumberFormatException e) {
             return null;
         }

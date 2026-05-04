@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
+import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor
@@ -23,27 +24,47 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        log.info("Clearing existing data for a fresh import...");
-        transactionRepository.deleteAll();
-        assetRepository.deleteAll();
+        log.info("Checking for initial data in /data/imported/...");
+        
+        // We no longer deleteAll() here to support persistent history with deduplication
+        
+        String dataPath = "/data/imported/";
+        File dir = new File(dataPath);
+        
+        if (!dir.exists() || !dir.isDirectory()) {
+            log.warn("Import directory not found: {}", dataPath);
+            return;
+        }
 
-        String[] files = {"may-4-akbank.csv", "may-4-ibkr.csv", "may-4-midas.csv"};
-        String dataPath = "/data/"; // Mounted in Docker
+        File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".csv"));
+        if (files == null || files.length == 0) {
+            log.info("No CSV files found in {}", dataPath);
+            return;
+        }
 
-        for (String fileName : files) {
-            File file = new File(dataPath + fileName);
-            if (file.exists()) {
-                log.info("Importing initial data from: {}", fileName);
-                String[] parts = fileName.split("-");
-                if (parts.length < 3) continue;
-                String platform = parts[2].replace(".csv", "");
-                try {
-                    csvImportService.importCsv(file.getAbsolutePath(), platform);
-                } catch (Exception e) {
-                    log.error("Failed to import {}: {}", fileName, e.getMessage());
-                }
-            } else {
-                log.warn("Initial data file not found: {}", file.getAbsolutePath());
+        // Sort files to ensure consistent import order if needed
+        Arrays.sort(files);
+
+        for (File file : files) {
+            log.info("Processing initial data from: {}", file.getName());
+            
+            // Try to detect platform from filename: e.g., "may-4-akbank.csv" -> "akbank"
+            String platform = "generic";
+            String[] parts = file.getName().split("-");
+            if (parts.length >= 3) {
+                platform = parts[2].replace(".csv", "");
+            } else if (file.getName().toLowerCase().contains("ibkr")) {
+                platform = "ibkr";
+            } else if (file.getName().toLowerCase().contains("midas")) {
+                platform = "midas";
+            } else if (file.getName().toLowerCase().contains("akbank")) {
+                platform = "akbank";
+            }
+
+            try {
+                csvImportService.importCsv(file.getAbsolutePath(), platform);
+            } catch (Exception e) {
+                log.error("Failed to import {}: {}", file.getName(), e.getMessage());
             }
         }
     }
