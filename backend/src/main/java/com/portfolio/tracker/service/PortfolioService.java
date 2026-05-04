@@ -34,7 +34,8 @@ public class PortfolioService {
             txs.sort(Comparator.comparing(Transaction::getTransactionDate));
 
             AssetSummaryDTO summary = calculateAssetSummary(asset, txs);
-            if (summary.getQuantity() > 0 || summary.getType() == AssetType.CASH) {
+            // Use a small epsilon to filter out floating point dust (like 1.11e-16)
+            if (summary.getQuantity() > 0.0001 || summary.getType() == AssetType.CASH) {
                 assetSummaries.add(summary);
                 totalValue += summary.getMarketValue();
                 totalPnL += summary.getPnl();
@@ -86,6 +87,8 @@ public class PortfolioService {
         double totalQuantity = 0;
         double totalCost = 0;
         
+        double multiplier = (asset.getType() == AssetType.OPTION) ? 100.0 : 1.0;
+        
         for (Transaction tx : txs) {
             Double q = tx.getQuantity();
             Double p = tx.getPrice();
@@ -94,7 +97,7 @@ public class PortfolioService {
             if (tx.getType() == TransactionType.BUY || tx.getType() == TransactionType.DEPOSIT) {
                 totalQuantity += q;
                 if (asset.getType() != AssetType.CASH) {
-                    totalCost += q * (p != null ? p : 0.0) + (tx.getFee() != null ? tx.getFee() : 0.0);
+                    totalCost += (q * (p != null ? p : 0.0) * multiplier) + (tx.getFee() != null ? tx.getFee() : 0.0);
                 }
             } else if (tx.getType() == TransactionType.SELL || tx.getType() == TransactionType.WITHDRAWAL) {
                 if (totalQuantity > 0) {
@@ -110,7 +113,7 @@ public class PortfolioService {
             currentPrice = (asset.getType() == AssetType.CASH) ? 1.0 : 0.0;
         }
         
-        double marketValue = totalQuantity * currentPrice;
+        double marketValue = totalQuantity * currentPrice * multiplier;
         double pnl = marketValue - totalCost;
         double pnlPercentage = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 

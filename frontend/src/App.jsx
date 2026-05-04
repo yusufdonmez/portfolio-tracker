@@ -30,6 +30,15 @@ function App() {
     }
   };
 
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   if (loading) {
     return (
       <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -85,7 +94,7 @@ function App() {
             </div>
             <span className="text-secondary">Toplam Varlık</span>
           </div>
-          <h2 style={{ fontSize: '36px' }}>${dashboardData.totalValue.toLocaleString()}</h2>
+          <h2 style={{ fontSize: '36px' }}>{formatCurrency(dashboardData.totalValue)}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '12px' }}>
             <TrendingUp className="text-success" size={16} />
             <span className="text-success">+12.5%</span>
@@ -100,7 +109,9 @@ function App() {
             </div>
             <span className="text-secondary">Toplam Kar/Zarar</span>
           </div>
-          <h2 style={{ fontSize: '36px' }} className="text-success">+${dashboardData.totalPnL.toLocaleString()}</h2>
+          <h2 style={{ fontSize: '36px' }} className={dashboardData.totalPnL >= 0 ? "text-success" : "text-danger"}>
+            {dashboardData.totalPnL >= 0 ? '+' : ''}{formatCurrency(dashboardData.totalPnL)}
+          </h2>
           <p className="text-secondary" style={{ marginTop: '12px' }}>Gerçekleşmemiş PnL</p>
         </div>
 
@@ -138,6 +149,7 @@ function App() {
                 <Tooltip 
                   contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '12px', boxShadow: '0 10px 20px rgba(0,0,0,0.2)' }}
                   itemStyle={{ color: '#fff' }}
+                  formatter={(value) => formatCurrency(value)}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -176,15 +188,15 @@ function App() {
               {dashboardData.assets.map((asset) => (
                 <tr key={asset.symbol}>
                   <td style={{ fontWeight: 600 }}>{asset.symbol}</td>
-                  <td>{asset.quantity}</td>
-                  <td>${asset.marketValue.toLocaleString()}</td>
+                  <td>{asset.quantity.toFixed(asset.type === 'CRYPTO' ? 4 : 2)}</td>
+                  <td>{formatCurrency(asset.marketValue)}</td>
                   <td className={asset.pnl >= 0 ? 'text-success' : 'text-danger'}>
-                    {asset.pnl >= 0 ? '+' : ''}{asset.pnl.toLocaleString()} ({asset.pnlPercentage.toFixed(1)}%)
+                    {asset.pnl >= 0 ? '+' : ''}{formatCurrency(asset.pnl)} ({asset.pnlPercentage.toFixed(1)}%)
                   </td>
                   <td>
                     <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
                       <div style={{ 
-                        width: asset.marketValue / dashboardData.totalValue * 100 + '%', 
+                        width: Math.min(100, (asset.marketValue / dashboardData.totalValue * 100)) + '%', 
                         height: '100%', 
                         background: asset.pnl >= 0 ? 'var(--success)' : 'var(--danger)',
                         borderRadius: '3px'
