@@ -113,7 +113,7 @@ function App() {
     <div className="dashboard-container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <div>
-          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.1.2</span></h1>
+          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Portföy Özeti <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '400' }}>v1.1.3</span></h1>
           <p className="text-secondary">Hoş geldin, yatırım yolculuğun burada.</p>
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
