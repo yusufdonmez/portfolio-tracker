@@ -25,10 +25,10 @@ services:
 
   # Frontend Service (Static Site)
   - type: static
-  name: portfolio-frontend
-  env: static
-  plan: free
-  buildCommand: cd frontend && npm install && npm run build
+    name: portfolio-frontend
+    env: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
       - key: VITE_API_URL
