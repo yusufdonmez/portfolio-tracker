@@ -24,7 +24,7 @@ services:
         value: update
 
   # Frontend Service (Static Site)
-  - type: static
+  - type: web
     name: portfolio-frontend
     env: static
     plan: free
