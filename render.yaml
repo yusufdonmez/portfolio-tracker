@@ -24,11 +24,9 @@ services:
         value: update
 
   # Frontend Service (Static Site)
-  - type: web
+  - type: static_site
     name: portfolio-frontend
-    env: static
     plan: free
-    region: frankfurt
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
